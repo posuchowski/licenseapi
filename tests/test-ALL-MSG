@@ -1,0 +1,83 @@
+#!/usr/bin/python
+
+#
+# test-ALL-MSG: Test all pickled messages for response
+#
+
+PACKAGE_ROOT = '/home/peter/src/license_service/licenseapi'
+OUTGOING_DIR = 'vlasic'
+INCOMING_DIR = None
+
+from collections import OrderedDict
+import os, sys, pickle, json, httplib, urllib, urllib2
+
+sys.path.append( os.path.dirname( os.getcwd() ) )
+sys.path.append( os.path.dirname( sys.path[ -1 ] ) )
+sys.path.append( '.' )
+
+try:
+    import unittest2 as unittest
+    sys.stderr.write( "test-vmf: import unittest2 as unittest, for paleopython version " )
+    sys.stderr.write( str( sys.version_info.major ) + '.' + str( sys.version_info.minor ) + '\n' )
+except Exception:
+    import unittest
+    sys.stderr.write( "test-vmf: import unittest\n" )
+
+        
+class MessageTester( unittest.TestCase ):
+
+    def _readMessages( self, path ):
+        sys.stderr.write( "LOADING path '%s'" % path )
+        msgs = OrderedDict()
+        files = os.listdir( path ); files.sort()
+        for f in files:
+            if f.endswith( '.swp' ): continue
+            if f.startswith( '_'  ): continue
+            try:
+                with open( os.path.join( path, f ) ) as FILE:
+                    data = pickle.load( FILE )
+            except:
+                sys.stderr.write( "FAILED to unpickle '%s' !!!\n" % f )
+            else:
+                msgs[ f ] = data
+                print "METHOD: %s =\n%s\n" % ( f, data )
+        return msgs
+
+    def _data_encode( self, request ):
+        get = '?data=' + urllib.quote_plus( json.dumps( request ) )
+        return get
+
+    def _getUrl( self, request ):
+        url    = 'http://localhost:8000'
+        method = '/licapi/json'
+        req    = url + method + self._data_encode( request )
+        # conn   = httplib.HTTPConnection( url )
+        print "\n\nREQUEST: %s\n\n" % req
+
+        request  = urllib2.Request( req )
+        opener   = urllib2.build_opener()
+
+        request.add_header( 'User-Agent',
+            'Mozilla/5.0 (X11; U; Linux i686) Gecko/20071127 Firefox/2.0.0.11'
+        )
+        sys.stderr.write( "OPEN URL: %s" % request.get_full_url() )
+        response = opener.open( request ).read()
+        return resp
+
+    def setUp( self ):
+        pass
+
+    def test_softaculous( self ):
+        messages = self._readMessages(os.path.join(
+            PACKAGE_ROOT, OUTGOING_DIR, 'softaculous' ) )
+        for msg in messages.items():
+            sys.stderr.write( "TRYING...: %s\t:\t" % msg[0] )
+            result = self._getUrl( msg[1] )
+            print "============================================="
+            print "RESULT:\n%s" % result
+            print "============================================="
+            
+if __name__ == '__main__':
+
+    unittest.main()
+

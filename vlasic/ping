@@ -1,0 +1,17 @@
+(dp0
+S'content_length'
+p1
+S'0'
+p2
+sS'content'
+p3
+(lp4
+sS'request'
+p5
+S'ping'
+p6
+sS'message_type'
+p7
+S'request'
+p8
+s.

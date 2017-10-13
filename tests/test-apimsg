@@ -1,0 +1,108 @@
+#!/usr/bin/python
+
+#
+# test-apimsg: Test the broker.ApiMessage type
+#
+
+import os, sys
+
+sys.path.append( os.path.dirname( os.getcwd() ) )
+sys.path.append( os.path.dirname( sys.path[ -1 ] ) )
+sys.path.append( '.' )
+
+from broker import ApiMessage
+from apis import NullApi
+import json
+
+try:
+    import unittest2 as unittest
+    sys.stderr.write( "test-vmf: import unittest2 as unittest, for paleopython version " )
+    sys.stderr.write( str( sys.version_info.major ) + '.' + str( sys.version_info.minor ) + '\n' )
+except Exception:
+    import unittest
+    sys.stderr.write( "test-vmf: import unittest\n" )
+
+class TestApiMessage( unittest.TestCase ):
+
+    test_result  = { 'field1': 'value1', 'field2': 'value2', 'field3': 'value3' }
+    test_result2 = { 'field1': 'valueA', 'field2': 'valueB', 'field3': 'valueC' }
+
+    def setUp( self ):
+        self.Msg = ApiMessage()
+        pass
+
+    def _buildTestMsg( self ):
+        h = self.Msg._getHeader( 'success' )
+        h[ 'content' ] = [ self.test_result, ]
+        h[ 'content_length' ] = 1
+        return h
+
+    def test_push_and_get( self ):
+        M = ApiMessage()
+        M.pushContent( self.test_result )
+        M.setStatus( 'success' )
+        self.assertEqual( [ self.test_result ], M.getContent() )
+
+    def test_build_message( self ):
+        M = ApiMessage()
+        M.pushContent( self.test_result )
+        M.setStatus( 'success' )
+
+        m = M.buildMessage()
+        h = self._buildTestMsg()
+
+        self.assertEqual( len( M ), 1 )  # only one item in content
+        self.assertIsNot( m, self.test_result )
+        self.assertIs( m, h )
+
+    def test_toJson( self ):
+        M = ApiMessage()
+        M.pushContent( self.test_result )
+        M.setStatus( 'success' )
+        sys.stderr.write( "\nM.toJson: %s\n" % M.toJson() )
+        sys.stderr.write( "\nTestMsg : %s\n" % json.dumps( self._buildTestMsg() )  )
+        self.assertEqual( M.toJson(), json.dumps( self._buildTestMsg() ) )
+
+    def test_addApiMessage( self ):
+        M = ApiMessage( DEBUG=True ); M2 = ApiMessage( DEBUG=True )
+        M2.pushContent( self.test_result )
+        M2.setStatus( 'error' )
+        M.pushContent( M2 )
+        sys.stderr.write( "\ntest_addApiMessage: Built multipart msg:\n%s\n\n" % M.buildMessage() )
+        self.assertTrue( True )
+
+    def test_popMatching( self ):
+        M = ApiMessage()
+        M.pushContent( self.test_result )
+        M.pushContent( self.test_result2 )
+        M.setStatus( 'success' )
+        sys.stderr.write( "\nPRE-POP: %s\n" % M.buildMessage() )
+        M.popMatching( 'field2', 'value2' )
+        sys.stderr.write( "\nPOST-POP: %s\n" % M.buildMessage() )
+        self.assertTrue( True )
+
+    def test_popFromMulti( self ):
+        M1 = ApiMessage( DEBUG=True ) 
+        M2 = ApiMessage( DEBUG=True )
+        M3 = ApiMessage( DEBUG=True )
+
+        M2.pushContent( self.test_result )
+        M3.pushContent( self.test_result2 )
+
+        M2.setStatus( 'success' )
+        M3.setStatus( 'error' )
+
+        M1.pushContent( M2 )
+        M1.pushContent( M3 )
+
+        sys.stderr.write( "\nPRE-POP: %s\n" % M1.buildMessage() )
+        M1.popMatching( 'field2', 'value2' )
+        sys.stderr.write( "\nPOST-POP: %s\n" % M1.buildMessage() )
+
+        self.assertTrue( True )
+        
+
+if __name__ == '__main__':
+
+    unittest.main()
+

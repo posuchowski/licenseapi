@@ -1,0 +1,36 @@
+#!/usr/bin/python
+
+import os, sys
+
+sys.path.append( os.path.dirname( os.getcwd() ) )
+sys.path.append( os.path.dirname( sys.path[ -1 ] ) )
+sys.path.append( '.' )
+
+from vendor import VendorManagerFactory
+from apis import NullApi
+
+try:
+    import unittest2 as unittest
+    sys.stderr.write( "test-vmf: import unittest2 as unittest, for paleopython version " )
+    sys.stderr.write( str( sys.version_info.major ) + '.' + str( sys.version_info.minor ) + '\n' )
+except Exception:
+    import unittest
+    sys.stderr.write( "test-vmf: import unittest\n" )
+
+class TestVMF( unittest.TestCase ):
+
+    def setUp( self ):
+        self.V = VendorManagerFactory()
+
+    def test_classLoading( self ):
+        apis = self.V._getApiList()
+        self.assertIn( ('nullvendor', NullApi.NullApi), apis )  # the NullApi should always be present
+        
+    def test_getVM( self ):
+        inst = self.V.getVendorManager( 'nullvendor' )
+
+
+if __name__ == '__main__':
+
+    unittest.main()
+

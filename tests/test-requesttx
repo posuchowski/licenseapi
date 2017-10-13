@@ -1,0 +1,204 @@
+#!/usr/bin/python
+
+#
+# test-requesttx
+#
+# Last known good test: 2012-11-5 14:37
+# After adding another subSplat option to copy values.
+# 
+
+import os, sys, pprint
+
+sys.path.append( os.path.dirname( os.getcwd() ) )
+sys.path.append( os.path.dirname( sys.path[ -1 ] ) )
+sys.path.append( '.' )
+
+from apis.manager import RequestTranslator
+from apis.LiteSpeedApi import LiteSpeedApi
+
+try:
+    import unittest2 as unittest
+    sys.stderr.write( sys.argv[0] +
+        ": import unittest2 as unittest, for paleopython version "
+    )
+    sys.stderr.write( str( sys.version_info.major ) + '.' +
+        str( sys.version_info.minor ) + '\n'
+    )
+except Exception:
+    import unittest
+    sys.stderr.write( sys.argv[0] + "import unittest\n" )
+
+
+class TestRequestTx( unittest.TestCase ):
+    """
+    Test the RequestTranslator class.
+    """
+    def setUp( self ):
+        self.someApi = LiteSpeedApi()
+        self.field_dict = {
+                'ips': [ 'ip', 'ipaddr', 'license_uid' ],
+                'key': [ 'key', 'license_key' ],
+                'tst': [ 'test', 'test_field', 'testField' ]
+        }
+        self.test_req = {
+            'content_length': '1',
+            'ip': '10.0.0.1',
+            'content': [
+                { 'one': 1,
+                  'two': 2,
+                  'key': 'value',
+                  'testField': 'testValue'
+                }
+            ],
+            'license_key': 'AAA-AAA-AAA',
+            'message_type': 'request',
+            'request': 'do_something'
+        }
+        self.test_res = { u'action': u'Query',
+               u'billing_cycle': u'Monthly',
+               u'license_expire_date': u'2012-11-08',
+               u'license_id': u'18399',
+               u'license_serial': u'NmD0-6X8W-8X0n-z/n3',
+               u'license_type': u'WS_L_2',
+               u'license_update_expire_date': u'2012-11-08',
+               u'message': u'LicenseDetail_IP',
+               u'next_due_date': u'2012-11-01',
+               u'order_date': u'2012-08-22',
+               u'query_field': u'LicenseDetail_IP:173.199.146.208',
+               u'result': u'success',
+               u'server_ip': u'173.199.146.208',
+               u'status': u'Active' } 
+            
+        self.Tx = RequestTranslator(
+            field_dict = self.field_dict,
+            request_dict = self.someApi.request_dict,
+            response_dict = self.someApi.response_dict
+        )
+
+    def test_getDict( self ):
+        self.assertEqual( self.field_dict, self.Tx.getDict() )
+
+    def test_allOur( self ):
+        self.assertEqual( self.field_dict[ 'ips' ], self.Tx.getAllOurFieldsFor( 'ips' ) )
+
+    def test_getTheir( self ):
+        self.assertEqual( self.Tx.getTheirFieldFor( 'test_field' ), 'tst' )
+        self.assertEqual( self.Tx.getTheirFieldFor( 'key' ), 'key' )
+
+    def test_getTheirKeys( self ):
+        self.assertEqual( self.Tx.getAllTheirFieldNames(), self.field_dict.keys() )
+
+    def test_requestFillsField( self ):
+        self.assertTrue( self.Tx.requestFillsField( 'ips', self.test_req ) )
+
+    def test_responseIsError( self ):
+        res = self.test_res.copy()
+        self.assertFalse( self.Tx.responseIsError( res ) )
+        res[ 'error' ] = None
+        self.assertFalse( self.Tx.responseIsError( res ) )
+        res[ 'error' ] = 'A fake error occurred.'
+        self.assertTrue( self.Tx.responseIsError( res ) )
+
+    def test_subResponseLitespeed( self ):
+        test_response = { 'type': 'WS_L_4' }
+        tx = self.someApi.translator
+        new = tx.subResponseValues(
+                tx.subResponseFields( test_response )
+        )
+        self.assertEqual( new[ 'cpus' ], '4' )
+        self.assertEqual( new[ 'license_type' ], 'cpu' )
+
+    def test_getRequested( self ):
+        test_request = { 'type': 'WS_L_4', 'ipaddr': '10.0.0.1' }
+        sys.stderr.write( "\nfield_dict: %s\nrequest_dict: %s\n" % \
+            ( self.someApi.request_dict, self.someApi.response_dict )
+        )
+        tx = RequestTranslator(
+                field_dict=self.someApi.field_dict,
+                request_dict=self.someApi.request_dict
+        )
+        field = tx.getRequested( 'server_ip', test_request )
+        sys.stderr.write( "FIELD: %s\n" % field )
+        self.assertIsNotNone( field )
+
+    def test_subResponseFields( self ):
+        """
+        The LiteSpeedApi's classes use case for RequestTranslator:
+        """
+        test_res = {
+            'license_update_expire_date': '2012-11-08',
+            'status': 'Active', 'license_serial': 'NmD0-6X8W-8X0n-z/n3',
+            'billing_cycle': 'Monthly', 
+            'next_due_date': '2012-11-01', 'license_type': 'WS_L_2',
+            'query_field': 'LicenseDetail_IP:173.199.146.208',
+            'license_expire_date': '2012-11-08', 'result': 'success',
+            'server_ip': '173.199.146.208', 'order_date': '2012-08-22',
+            'action': 'Query', 'license_id': '18399',
+            'message': 'LicenseDetail_IP', 'type': 'WS_L_4'
+        }
+        tx = RequestTranslator(
+                field_dict = self.someApi.field_dict,
+                response_dict = self.someApi.response_dict,
+                request_dict = self.someApi.request_dict
+        )
+        sys.stderr.write( "\nBEFORE Substitutions: " )
+        pprint.pprint( test_res )
+
+        tx.subResponseFields( test_res )
+        sys.stderr.write( "\nTEST_subResponseFields: " )
+        pprint.pprint( test_res )
+        sys.stderr.write( "\n" )
+
+        tx.subResponseValues( test_res )
+        sys.stderr.write( "\nTEST_subResponseValues: " )
+        pprint.pprint( test_res )
+
+    def test_subSplats( self ):
+        """
+        Test substitution of the two forms of '*' allowed. See source for
+        better comments.
+        """
+        # The translation dictionaries. Not testing field sub in this func.
+        test_field_dict = {}
+        test_tx_dict = {
+            # add hard-coded fields for any value of field1
+            'field1': {
+                '*': {
+                    'field2': 'true',
+                    'field3': 'false',
+                },
+            },
+            # put any value of field4 into field5
+            'field4': {
+                '*': {
+                    'field5': '*'
+                }
+            },
+        }
+
+        # Test input and the expected translated result:
+        test_dict = {
+            'field1': 'someval',
+            'field4': 'another',
+        }
+        expected = {
+            'field1': 'someval',
+            'field2': 'true',
+            'field3': 'false',
+            'field4': 'another',
+            'field5': 'another'
+        }
+
+        tx = RequestTranslator(
+                field_dict=test_field_dict,
+                request_dict = test_tx_dict,
+                response_dict = test_tx_dict
+        )
+        result = tx.subRequestValues( test_dict )
+        pprint.pprint( result )
+        self.assertEqual( result, expected )
+
+if __name__ == '__main__':
+
+    unittest.main()
+

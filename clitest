@@ -1,0 +1,449 @@
+#!/usr/bin/python
+"""
+clitest is a time-saver for manually testing Django JSON handlers
+where it's onerous to have to type or json.dump() the object every
+time a request needs to be made.
+
+Furthermore, requests can be written once and then pickled for later
+use in both hand and unit testing. So one can make both good and malformed
+requests and save them for later.
+
+clitest can test using both django.test.client.Client or via HTTP:
+
+send = send request to Client
+get  = send GET request via HTTP
+
+The help option may not be up to date so read the code instead.
+"""
+import json, sys, os, pickle, pprint, readline, atexit, httplib, urllib, re, time
+
+sys.path.append( os.path.dirname( os.getcwd() ) )
+os.environ[ 'DJANGO_SETTINGS_MODULE' ] = 'license_service.settings'
+
+import django.test.client
+from django.shortcuts import render
+
+exceptions = []
+              
+help_list = [ 'help or ?: get help',
+         'clear: request = {}',
+         'show: print json dump of dict',
+         'quit',
+         'send: send Django client request',
+         'time: print the time of the last request (_last_time in the set dict)',
+         'get: send request via HTTP get using httplib',
+         'throw: throw the last exception (not useful until we use the exception module, which we dont)',
+         'del[ete] : <KEY>',
+         'python: start interpreter',
+         'pickle | save <filename>',
+         'load <filename>',
+         '!<shell command>',
+         'reload: reload this program',
+         'set: change our settings (type set<CR> to show)',
+         'encode: dump the URL that would be loaded by "get" command',
+         'h: show 20 lines of history',
+         '#<INT>: execute history item $INT',
+         'u[pdate] <KEY> <VALUE>|<KEY> <VALUE>: update a response key',
+        ]
+help_list.sort()
+
+histfile = os.path.join(os.path.expanduser("~"), ".clitest")
+readline.parse_and_bind( 'tab: complete' )
+readline.parse_and_bind( 'set editing-mode vi' )
+readline.set_history_length( 1000 )
+
+auto = {
+    'show': False,
+    'print': True,
+    'throw': False,
+    'pretty': False,
+    'tofile': True,
+    'erase': True,
+    'time': False,
+    '_last_time': 0,
+}
+
+request = {}
+
+def _cleanup():
+    save( '.clitest.tmp' )
+    readline.write_history_file( histfile )
+    with open( '.clitest.set', 'w+' ) as FILE:
+        pickle.dump( auto, FILE )
+    sys.stderr.write( "_cleanup: pickled your settings.\n" )
+
+def cli_history():
+    try:
+        readline.read_history_file( histfile )
+    except IOError:
+        print "Notice: Readline history file could not be loaded.\n"
+    atexit.register( _cleanup )
+
+def get_user_input():
+    try:
+        line = raw_input( "clitest~> " )    
+    except EOFError:
+        quit()
+    return line
+
+def parse_user_input( line ):
+
+    if line.isspace(): return
+    if line == "": return
+
+    cmd = arg = ""
+    line = line.strip()
+
+    while '$' in line:
+        var = re.search( r'\$(\w+)', line ).group(1)
+        if var in auto:
+            line = re.sub( r'\$\w+', auto[ var ], line )
+
+    if line[0] == '#':
+        try:
+            hist = int( line[1:] )
+        except:
+            pass
+        else:
+            line = readline.get_history_item( hist )
+            if auto[ 'erase' ]: readline.remove_history_item( readline.get_current_history_length()-1 )
+
+    if ':' in line:
+        pairs = line.split(':')
+        k, v = ( pairs[0].strip(), pairs[1].strip() )
+        try:
+            w = v
+            v = eval( v )
+            print "eval( %s )" % w  # show that it was successfully eval'ed
+        except:
+            print '"%s"' % w        # or assigned as a string literal
+        request[ k ] = v
+        return
+
+    if line[0] == '!':
+        shell( line )
+        return
+
+    if ' ' in line:
+        cmd, arg = line.split(' ', 1)
+    else:
+        cmd = line
+
+    if cmd == 'show'    : show()       ; return
+    elif cmd == 'del'   : delete( arg ); return
+    elif cmd == 'delete': delete( arg ); return
+    elif cmd == 'reload': reClient()   ; return
+    elif cmd == 'python': python()     ; return
+    elif cmd == 'help'  : help()       ; return
+    elif cmd == 'clear' : clear()      ; return
+    elif cmd == 'autoshow': autoshow() ; return
+    elif cmd == 'quit'  : quit()       ; return
+    elif cmd == 'exit'  : quit()       ; return
+    elif cmd == 'q'     : quit()       ; return
+    elif cmd == 'send'  : send()       ; return
+    elif cmd == 'time'  : printtime()  ; return
+    elif cmd == 'get'   : getUrl( arg ); return
+    elif cmd == 'save'  : save( arg )  ; return
+    elif cmd == 'throw' : throw()      ; return
+    elif cmd == 'load'  : load( arg )  ; return
+    elif cmd == 'set'   : setopt( arg ); return
+    elif cmd == 'encode': encode()     ; return
+    elif cmd == 'h'     : history(arg) ; return
+    elif cmd == 'u'     : update( arg ); return
+    elif cmd == 'update': update( arg ); return
+    else:
+        print "Huh?"
+
+def _printline( char ):
+    for i in range(79):
+        sys.stdout.write( char )
+    sys.stdout.write( '\n' )
+
+def _mk_url():
+    if 'url' not in auto.keys():
+        print "Key 'url' not set.\n"
+        return None
+    if 'method' not in auto.keys():
+        print "Key 'method' not set.\n"
+        return None
+
+    url = auto[ 'url' ]
+    method = auto[ 'method' ]
+
+    if 'port' not in auto.keys():
+        print "Assuming port 80. Set key 'port' to prevent this."
+    else:
+        url = url + ':' + str( auto[ 'port' ] )
+    return url
+
+def _data_encode():
+    req = auto[ 'method' ] + '?data=' + urllib.quote_plus( json.dumps( request ) )
+    if req[0] != '/':
+        req = '/' + req
+    return req
+
+def _onHashUpdate():
+    if auto[ 'show' ] is True:
+        show()
+
+def history( arg ):
+    if arg:
+        count = int(arg)
+    else:
+        count = 20
+    for i in range( (readline.get_current_history_length() - count), readline.get_current_history_length() ):
+        print "%s\t%s" % ( i, readline.get_history_item( i ) )
+
+def encode():
+    url = _mk_url()
+    if url is None:
+        return
+    total = url + _data_encode()
+    print total
+
+
+def getUrl( arg ):
+    url = _mk_url()
+    if url is None:
+        return
+
+    if 'https:' in url:
+        url = url.split(':',1)[1][2:]
+        conn = httplib.HTTPSConnection( url )
+    else:
+        conn = httplib.HTTPConnection( url )
+    if conn is None:
+        print "Problem: conn is None"
+    else:
+        print "Connection: %s" % url
+
+    req = _data_encode()
+
+    print "Sending GET request: %s" % req
+    conn.request( 'GET', req )
+    resp = conn.getresponse()
+    
+    _printline( '-' )
+    print "Status: %s %s" % ( resp.status, resp.reason )
+    _printline( '-' )
+    print resp.read()
+    _printline( '-' )
+    sys.stdout.write( '\n' )
+    
+def delete( arg ):
+    global request
+    try:
+        del request[ arg ]
+    except:
+        print "KeyError"
+    _onHashUpdate()
+
+def update( arg ):
+    global request
+    args = arg.split()
+    if len( args ) == 2:
+        try:
+            args[1] = eval( args[1] )
+        except:
+            print '%s: "%s"' % ( args[0], args[1] )
+        else:
+            print "eval( %s )" % args[1]
+        if args[0] in request.keys():
+            request[ args[0] ] = args[1] 
+            print "request[ %s ] = %s" % ( args[0], args[1] )
+        else:
+            print "No key '%s' in request object." % args[0]
+    elif len( args ) == 3:
+        try:
+            args[2] = eval( args[2] )
+        except:
+            print '%s[ %s ]: "%s"' % ( args[0], args[1], args[2] )
+        else:
+            print "%s[ %s ]: eval( %s )" % ( arg[0], args[1], args[2] )
+        if args[0] in request.keys():
+            if type( request[ args[0] ] ) == dict:
+                if args[1] in request[ args[0] ].keys():
+                    request[ args[0] ][ args[1] ] = args[2]
+                    print "request[ %s ][ %s ] = %s" % ( args[0], args[1], args[2] )
+                else:
+                    print "No key '%s' in request[ %s ]." % ( args[1], args[0] )
+            else:
+                print "request[ %s ] is not a dictionary." % args[0]
+        else:
+            print "No key '%s' in request object." % args[0]
+    elif len( args ) == 4:
+        key1 = args[0]
+        idx  = args[1]
+        key2 = args[2]
+        val  = args[3]
+
+        try:
+            val = eval( val )
+        except:
+            print '"%s"' % val
+
+        try:
+            idx = int( idx )
+            request[ key1 ][ idx ][ key2 ] = val
+        except Exception as E:
+            print "Couldn't set request[ %s ][ %s ][ %s ] to '%s'" % ( key1, idx, key2, val )
+            raise( E )
+        else:
+            print "request[ %s ][ %s ][ %s ] = '%s'" % ( key1, idx, key2, val )
+    else:
+        print "update: incorrect number of arguments--should be {2,3}"
+
+
+def reClient():
+    print "Clean and reload..."
+    os.system( './dist-clean' )
+    sys.stdout.flush(); sys.stderr.flush()
+    readline.write_history_file()
+    os.execl( './clitest', json.dumps( request ) )
+
+def python():
+    os.system( 'python' )
+
+def shell( line ):
+    line = line[1:]
+    os.system( line )
+
+def help():
+    print "Commands:\n"
+    for h in help_list:
+        print h
+    print "\nClitest uses readline. Use CTRL-J to put readline in Vi mode."
+
+def clear():
+    global request
+    request = {}
+    show()
+
+def show():
+    global request
+    if auto[ 'pretty' ] is True:
+        pprint.pprint( request )
+    else:
+        print json.dumps( request )
+
+def autoshow():
+    if auto[ 'show' ] == True:
+        show()
+
+def setopt( arg ):
+    if arg == "" or arg is None:
+        for toople in auto.items():
+            print "%s: %s" % toople
+        return
+
+    if arg[:2] == 'no':
+        arg = arg[2:]
+        val = False
+    elif " " in arg:
+        arg, val = arg.split(' ', 1) 
+    else:
+        val = True
+    print "set %s %s" % ( arg, val )
+    auto[ arg ] = val
+
+def quit():
+    print ""
+    sys.exit(0)
+
+def send():
+    global exceptions
+    time_start = time_stop = 0
+    data = json.dumps( request )
+    pprint.pprint( data )
+    if auto['throw'] is False:
+        try:
+            time_start = time.time()
+            res  = client.get( url % data )
+            time_stop = time.time()
+        except Exception as e:
+            print "An exception occurred:\n%s" % repr( e )
+            exceptions.append( e )
+            return
+    else:
+        pprint.pprint( url % data )
+        time_start = time.time()
+        res = client.get( url % data )
+        time_stop = time.time()
+    auto[ '_last_time' ] = time_stop - time_start
+
+    if res.status_code != 200:
+        print "ERROR: status_code = %s" % res.status_code
+        return
+
+    if auto[ 'print' ] is True:
+        if auto[ 'pretty' ] is True:
+            pprint.pprint( json.loads( res.content ) )
+        else:
+            print res.content
+    if auto[ 'tofile' ] is True:
+        with open( './clitest.out', 'w' ) as FILE:
+            pprint.pprint( json.loads( res.content ), FILE )
+    if auto[ 'time' ] is True:
+        printtime()
+
+def printtime():
+    print str( auto[ '_last_time' ] ) + ' sec'
+
+def throw():
+    if len( exceptions ) > 0:
+        e = exceptions.pop()
+        raise e
+    else:
+        print "No exceptions.\n"
+
+def save( filename ):
+    filename = filename.strip()
+    with open( filename, 'w+' ) as FILE:
+        pickle.dump( request, FILE )
+    print "Pickled %s\n" % filename
+    
+def load( filename ):
+    global request
+    filename = filename.strip()
+    try:
+        with open( filename ) as FILE:
+            request = pickle.load( FILE )
+        print "Loaded %s\n" % filename
+    except:
+        print "Couldn't find or load file '%s'" % filename
+
+def load_settings():
+    global auto
+    if os.path.isfile( '.clitest.set' ) is True:
+        with open( '.clitest.set' ) as FILE:
+            auto = pickle.load( FILE )
+        print "Loaded settings in .clitest.set"
+    else:
+        print "No .clitest.set to load: skipped"
+
+
+#
+# MAIN
+#
+
+if __name__ == '__main__':
+
+    if os.path.exists( '.clitest.tmp' ):
+        load( '.clitest.tmp' )
+
+    cli_history()
+    load_settings()
+    client = django.test.client.Client()
+    url = "/licapi/json?data=%s"
+
+    while 1:
+        if auto[ 'show' ] is True:
+            show()
+        l = get_user_input()
+        parse_user_input( l )
+
+
+#
+# :wq
+#
+
