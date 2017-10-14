@@ -5,7 +5,7 @@ use cPanelLicensing;
 
 my $ip = $ARGV[0];
 
-my $licenseManager = new cPanelLicensing(user => 'wiredtree',
+my $licenseManager = new cPanelLicensing(user => 'company',
 					pass => 'EB9uEROmOc0ZM4tH');
 
 

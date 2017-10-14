@@ -53,6 +53,7 @@ class RunCommand:
         '''
         pass
 
+    # Accessors?? Really??
     def getExit( self ):
         '''
         Get the exit status of command.

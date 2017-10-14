@@ -4,7 +4,7 @@ use cPanelLicensing;
 
 my $ip = '208.86.157.254';
 
-my $licenseManager = new cPanelLicensing(user => 'wiredtree',
+my $licenseManager = new cPanelLicensing(user => 'company',
                                         pass => 'Ivghx4rPYIzeied5');
 
 

@@ -5,14 +5,14 @@ use cPanelLicensing;
 
 my $ip = $ARGV[0];
 
-my $licenseManager = new cPanelLicensing(user => 'wiredtree',
+my $licenseManager = new cPanelLicensing(user => 'company',
 					pass => 'EB9uEROmOc0ZM4tH');
 
 my (%GROUPS) = $licenseManager->fetchGroups();
 my (%PACKAGES) = $licenseManager->fetchPackages();
 
-my $groupid = $licenseManager->findKey('WiredTree\*',\%GROUPS);
-my $packageid = $licenseManager->findKey('WIREDTREE-INTERNAL-VZZO',\%PACKAGES);
+my $groupid = $licenseManager->findKey('Company\*',\%GROUPS);
+my $packageid = $licenseManager->findKey('COMPANY-INTERNAL-VZZO',\%PACKAGES);
 
 
 my $liscid = $licenseManager->activateLicense(ip => $ip,

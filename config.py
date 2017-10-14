@@ -16,20 +16,20 @@ APIS = { 'nullvendor': 'NullApi',
 # These are the foreign API credentials.
 CREDENTIALS = {
     'netenberg':
-    { 'username': 'wiredtree',
+    { 'username': 'yourcompany',
       'password': 'vC2ZdwxxvudskH4N'
     },
     'litespeed': {
-        'username': 'support@wiredtree.com',
+        'username': 'support@yourcompany.com',
         'password': 'u7MeSwzUBbAFkH4N',
     },
     'softaculous': {
-        'username' : 'wiredtree',
+        'username' : 'yourcompany',
         'password' : '9nuh5N7Yjxi8kH4N',
-        'authemail': 'posuchowski@wiredtree.com'  # required by softaculous
+        'authemail': 'somebody@yourcompany.com'  # required by softaculous
     },
     'cpanel': {
-        'username': 'wiredtree',
+        'username': 'yourcompany',
         'password': 'ABydEu7njPqTkH4N',
     },
 }

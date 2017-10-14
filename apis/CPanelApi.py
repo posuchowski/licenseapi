@@ -122,7 +122,7 @@ class CPanelApi( VendorManager, BasicAuthPostClient ):
         'get_license_risk_data',
         'get_package_list',
         'get_support_list',
-        'get_wiredtree_group',
+        'get_Company_group',
         'modify_license',
     ]
 
@@ -176,7 +176,7 @@ class CPanelApi( VendorManager, BasicAuthPostClient ):
 
     def _get_expired_licenses( self, req, msg ):
         """
-        Leave exposed but not an official Wiredtree API method.
+        Leave exposed but not an official Company API method.
         """
         req[ 'expired' ] = '2'
         self._get_list( req, msg )
@@ -201,7 +201,7 @@ class CPanelApi( VendorManager, BasicAuthPostClient ):
     def get_license_risk_data( self, req, msg ):
         """
         Calling this function returns:
-        {u'reason': u'wiredtree is not allowed to access secverify.',
+        {u'reason': u'Company is not allowed to access secverify.',
                u'status': 0}
         """
         req = self.translator.subRequestFields( req )
@@ -227,7 +227,7 @@ class CPanelApi( VendorManager, BasicAuthPostClient ):
 
     def get_group_list( self, ignored, msg ):
         """
-        Fetch wiredtree's group information from Cpanel.
+        Fetch company's group information from Cpanel.
         """
         groups = json.loads( self.callMethod( 'XMLgroupInfo.cgi' ) )[ 'groups' ]
         for group_id, group_name in groups.items():
@@ -238,13 +238,13 @@ class CPanelApi( VendorManager, BasicAuthPostClient ):
             )
             msg.pushContent( res )
 
-    def get_wiredtree_group( self, ignored, msg ):
+    def get_company_group( self, ignored, msg ):
         """
         May or may not prove to be a cute shortcut
         """
         groups = json.loads( self.callMethod( 'XMLgroupInfo.cgi' ) )[ 'groups' ]
         for group_id, group_name in groups.items():
-            if group_name.decode() == 'WiredTree*':
+            if group_name.decode() == 'Company*':
                 res = self.translator.subResponseValues(
                         { 'group_id': group_id,
                           'group_name': group_name
@@ -294,7 +294,7 @@ class CPanelApi( VendorManager, BasicAuthPostClient ):
             del req[ 'vendor'  ]
             del req[ 'product' ]
 
-            req[ 'reason' ] = 'WiredTree internal API method call'
+            req[ 'reason' ] = 'Company internal API method call'
             req[ 'output' ] = 'json'
 
             req = self.translator.subRequestFields( req )

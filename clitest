@@ -1,12 +1,10 @@
 #!/usr/bin/python
 """
-clitest is a time-saver for manually testing Django JSON handlers
-where it's onerous to have to type or json.dump() the object every
-time a request needs to be made.
+clitest is for manually testing Django JSON handlers where it's onerous to
+have to type or json.dump() the object every time a request needs to be made.
 
-Furthermore, requests can be written once and then pickled for later
-use in both hand and unit testing. So one can make both good and malformed
-requests and save them for later.
+Requests can be written once and then pickled for later use in both hand and
+unit testing.
 
 clitest can test using both django.test.client.Client or via HTTP:
 

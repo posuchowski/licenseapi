@@ -13,7 +13,7 @@
 NOTE: In web panel, license is marked as expiring 22/10/2012, i.e. the day it was bought. Despite 'added': '-1M' entire time seems to have been refunded.
 
 == FAILED: ALREADY REFUNDED ==
-( WebClient calls: /noc?nocname=wiredtree&nocpass=LB7dqB9s0MJWJ1v3&ca=refund&actid=285858 )
+( WebClient calls: /noc?nocname=company&nocpass=LB7dqB9s0MJWJ1v3&ca=refund&actid=285858 )
 {'error': {'already_refunded': 'This transaction has already been refunded to you.'}}
 
 
