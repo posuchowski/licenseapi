@@ -1,6 +1,17 @@
 #
 # module licenseapi.apis.manager: VendorManager, RequestTranslator
 #
+# This file contains the most complex code of the project, getting
+# a grade of C from radon. My justification is encapsulation of
+# complexity into data and a well-tested class, thus allowing the
+# boring, framework-like code of the specific apis.
+#
+# In fact, since the field relationships are specified in data, it's time
+# to refactor and see if it's possible to provide a generic method that
+# takes the incoming API method name, calls a specific method if the the
+# API handler defined it, but otherwise just looks up the name in a hash
+# and makes the request. Perhaps much of the boring code could be eliminated.
+#
 
 import sys, types, datetime
 
